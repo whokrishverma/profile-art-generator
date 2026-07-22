@@ -1,14 +1,21 @@
 name: Generate and publish profile art
 
 # Lives in the PRIVATE repo (e.g. whokrishverma/profile-art-generator).
-# Builds ascii.svg, contrib-heatmap.svg, info-card.svg here, then pushes
-# ONLY those three files to the PUBLIC whokrishverma/whokrishverma repo,
-# where GitHub actually renders the profile README. No scripts, no source
-# photo, no generation logic ever touches the public repo.
+# Builds whichever of ascii.svg / contrib-heatmap.svg / info-card.svg are
+# due for an update, then pushes ONLY the changed files to the PUBLIC
+# whokrishverma/whokrishverma repo, where GitHub renders the profile README.
+#
+# Trigger behavior:
+#   - heatmap + info card: regenerated on every push to main, and on manual
+#     "Run workflow" -- NOT on the hourly schedule.
+#   - ascii portrait: regenerated when photo.jpg changes in a push, OR when
+#     your live GitHub avatar differs from photo.jpg (checked hourly and on
+#     manual run, since GitHub fires no event for an avatar change).
 
 "on":
   schedule:
-    - cron: "30 18 * * *"   # 18:30 UTC = 12:00 AM IST (Mumbai time)
+    - cron: "0 * * * *"     # hourly avatar-change check
+    - cron: "30 18 * * *"   # nightly heatmap + info card refresh (~12am IST)
   workflow_dispatch: {}
   push:
     branches: [main]
@@ -17,8 +24,9 @@ jobs:
   build-and-publish:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout private repo (scripts + source photo)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # full history so we can diff photo.jpg on push
 
       - uses: actions/setup-python@v5
         with:
@@ -27,21 +35,89 @@ jobs:
       - name: Install dependencies
         run: pip install pillow numpy opencv-python-headless
 
-      - name: Generate ASCII portrait
-        run: python make_ascii_svg_illustration_v5.py photo.jpg ascii.svg
+      # ---------------------------------------------------------------
+      # 1. On a push: did photo.jpg itself change in this push?
+      # ---------------------------------------------------------------
+      - name: Check if photo.jpg changed in this push
+        id: photo_diff
+        if: github.event_name == 'push'
+        run: |
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.event.after }}"
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "$BEFORE" "$AFTER" | grep -q '^photo\.jpg$'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Generate contribution heatmap
-        run: python generate_streak_svg_v1.py whokrishverma contrib-heatmap.svg
+      # ---------------------------------------------------------------
+      # 2. On schedule / manual run: has the live GitHub avatar changed?
+      # ---------------------------------------------------------------
+      - name: Download current GitHub avatar
+        if: github.event_name != 'push'
+        run: curl -sL "https://github.com/whokrishverma.png?size=460" -o avatar_new.jpg
 
-      - name: Generate info card
-        run: python make_info_card_v1.py
+      - name: Check if avatar differs from photo.jpg
+        id: avatar_diff
+        if: github.event_name != 'push'
+        run: |
+          if [ -f photo.jpg ] && cmp -s photo.jpg avatar_new.jpg; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
+      - name: Adopt new avatar as photo.jpg
+        if: github.event_name != 'push' && steps.avatar_diff.outputs.changed == 'true'
+        run: mv avatar_new.jpg photo.jpg
+
+      # ---------------------------------------------------------------
+      # 3. Regenerate only what's due
+      # ---------------------------------------------------------------
+      - name: Regenerate ASCII portrait
+        id: ascii_gen
+        if: >
+          (github.event_name == 'push' && steps.photo_diff.outputs.changed == 'true') ||
+          (github.event_name != 'push' && steps.avatar_diff.outputs.changed == 'true')
+        run: |
+          python make_ascii_svg_illustration_v5.py photo.jpg ascii.svg
+          echo "done=true" >> "$GITHUB_OUTPUT"
+
+      - name: Regenerate contribution heatmap
+        id: heatmap_gen
+        if: >
+          github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'schedule' && github.event.schedule == '30 18 * * *')
+        run: |
+          python generate_streak_svg_v1.py whokrishverma contrib-heatmap.svg
+          echo "done=true" >> "$GITHUB_OUTPUT"
+
+      - name: Regenerate info card
+        id: infocard_gen
+        if: >
+          github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'schedule' && github.event.schedule == '30 18 * * *')
+        run: |
+          python make_info_card_v1.py
+          echo "done=true" >> "$GITHUB_OUTPUT"
+
+      # ---------------------------------------------------------------
+      # 4. Push only the files that were actually regenerated this run
+      # ---------------------------------------------------------------
       - name: Push generated SVGs to the public profile repo
+        if: >
+          steps.ascii_gen.outputs.done == 'true' ||
+          steps.heatmap_gen.outputs.done == 'true' ||
+          steps.infocard_gen.outputs.done == 'true'
         env:
           GH_TOKEN: ${{ secrets.PROFILE_REPO_PAT }}
         run: |
           git clone https://x-access-token:${GH_TOKEN}@github.com/whokrishverma/whokrishverma.git public-repo
-          cp ascii.svg contrib-heatmap.svg info-card.svg public-repo/
+          [ "${{ steps.ascii_gen.outputs.done }}" = "true" ] && cp ascii.svg public-repo/
+          [ "${{ steps.heatmap_gen.outputs.done }}" = "true" ] && cp contrib-heatmap.svg public-repo/
+          [ "${{ steps.infocard_gen.outputs.done }}" = "true" ] && cp info-card.svg public-repo/
           cd public-repo
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
