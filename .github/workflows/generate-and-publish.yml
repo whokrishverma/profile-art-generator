@@ -6,17 +6,20 @@ name: Generate and publish profile art
 # whokrishverma/whokrishverma repo, where GitHub renders the profile README.
 #
 # Trigger behavior:
-#   - heatmap + info card: regenerated on every push to main, and on manual
-#     "Run workflow" -- NOT on the hourly schedule.
-#   - ascii portrait: regenerated when photo.jpg changes in a push, OR when
-#     your live GitHub avatar differs from photo.jpg (checked hourly and on
-#     manual run, since GitHub fires no event for an avatar change).
-#     Uses photo.type ("illustration" or "real") to pick the right generator.
+#   - ascii portrait: avatar checked at midnight only; script runs only if
+#     the avatar actually differs from photo.jpg. Also runs on push (if
+#     photo.jpg changed in that push) and always on manual run.
+#   - heatmap: regenerated every 6 hours, at midnight, on every push, and
+#     on manual run. (The SVG is only pushed to the public repo if it
+#     actually differs from what's already published, via the diff-staged
+#     check in the final step -- so "no visible change" still costs a
+#     cheap script run, but never an unnecessary commit.)
+#   - info card: runs at midnight, on every push, and on manual run.
 
 "on":
   schedule:
-    - cron: "0 * * * *"     # hourly avatar-change check
-    - cron: "30 18 * * *"   # nightly heatmap + info card refresh (~12am IST)
+    - cron: "0 */6 * * *"    # heatmap: every 6 hours
+    - cron: "30 18 * * *"    # midnight (~IST): ascii avatar check + heatmap + info card
   workflow_dispatch: {}
   push:
     branches: [main]
@@ -54,15 +57,18 @@ jobs:
           fi
 
       # ---------------------------------------------------------------
-      # 2. On schedule / manual run: has the live GitHub avatar changed?
+      # 2. Avatar check: only on manual run, or the midnight cron
       # ---------------------------------------------------------------
       - name: Download current GitHub avatar
-        if: github.event_name != 'push'
+        id: avatar_download
+        if: >
+          github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'schedule' && github.event.schedule == '30 18 * * *')
         run: curl -sL "https://github.com/whokrishverma.png?size=460" -o avatar_new.jpg
 
       - name: Check if avatar differs from photo.jpg
         id: avatar_diff
-        if: github.event_name != 'push'
+        if: steps.avatar_download.outcome == 'success'
         run: |
           if [ -f photo.jpg ] && cmp -s photo.jpg avatar_new.jpg; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
@@ -71,7 +77,7 @@ jobs:
           fi
 
       - name: Adopt new avatar as photo.jpg
-        if: github.event_name != 'push' && steps.avatar_diff.outputs.changed == 'true'
+        if: steps.avatar_diff.outputs.changed == 'true'
         run: mv avatar_new.jpg photo.jpg
 
       # ---------------------------------------------------------------
@@ -80,8 +86,9 @@ jobs:
       - name: Regenerate ASCII portrait
         id: ascii_gen
         if: >
+          github.event_name == 'workflow_dispatch' ||
           (github.event_name == 'push' && steps.photo_diff.outputs.changed == 'true') ||
-          (github.event_name != 'push' && steps.avatar_diff.outputs.changed == 'true')
+          (github.event_name == 'schedule' && steps.avatar_diff.outputs.changed == 'true')
         run: |
           TYPE=$(cat photo.type | tr -d '[:space:]')
           if [ "$TYPE" = "illustration" ]; then
@@ -95,9 +102,9 @@ jobs:
         id: heatmap_gen
         if: >
           github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
-          (github.event_name == 'schedule' && github.event.schedule == '30 18 * * *')
+          github.event_name == 'schedule'
         run: |
-          python generate_streak_svg_v1.py AVIVASHISHTA29 contrib-heatmap.svg
+          python generate_streak_svg_v1.py whokrishverma contrib-heatmap.svg
           echo "done=true" >> "$GITHUB_OUTPUT"
 
       - name: Regenerate info card
@@ -110,7 +117,7 @@ jobs:
           echo "done=true" >> "$GITHUB_OUTPUT"
 
       # ---------------------------------------------------------------
-      # 4. Push only the files that were actually regenerated this run
+      # 4. Push only the files that were actually regenerated AND changed
       # ---------------------------------------------------------------
       - name: Push generated SVGs to the public profile repo
         if: >
