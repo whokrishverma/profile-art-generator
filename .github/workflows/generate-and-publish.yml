@@ -1,0 +1,50 @@
+name: Generate and publish profile art
+
+# Lives in the PRIVATE repo (e.g. whokrishverma/profile-art-generator).
+# Builds ascii.svg, contrib-heatmap.svg, info-card.svg here, then pushes
+# ONLY those three files to the PUBLIC whokrishverma/whokrishverma repo,
+# where GitHub actually renders the profile README. No scripts, no source
+# photo, no generation logic ever touches the public repo.
+
+"on":
+  schedule:
+    - cron: "30 18 * * *"   # 18:30 UTC = 12:00 AM IST (Mumbai time)
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout private repo (scripts + source photo)
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pillow numpy opencv-python-headless
+
+      - name: Generate ASCII portrait
+        run: python make_ascii_svg_illustration_v5.py photo.jpg ascii.svg
+
+      - name: Generate contribution heatmap
+        run: python generate_streak_svg_v1.py whokrishverma contrib-heatmap.svg
+
+      - name: Generate info card
+        run: python make_info_card_v1.py
+
+      - name: Push generated SVGs to the public profile repo
+        env:
+          GH_TOKEN: ${{ secrets.PROFILE_REPO_PAT }}
+        run: |
+          git clone https://x-access-token:${GH_TOKEN}@github.com/whokrishverma/whokrishverma.git public-repo
+          cp ascii.svg contrib-heatmap.svg info-card.svg public-repo/
+          cd public-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ascii.svg contrib-heatmap.svg info-card.svg
+          git diff --staged --quiet || git commit -m "chore: refresh profile art [skip ci]"
+          git push
