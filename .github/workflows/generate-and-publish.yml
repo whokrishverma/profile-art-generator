@@ -97,7 +97,7 @@ jobs:
           github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
           (github.event_name == 'schedule' && github.event.schedule == '30 18 * * *')
         run: |
-          python generate_streak_svg_v1.py AVIVASHISHTA9 contrib-heatmap.svg
+          python generate_streak_svg_v1.py AVIVASHISHTA29 contrib-heatmap.svg
           echo "done=true" >> "$GITHUB_OUTPUT"
 
       - name: Regenerate info card
