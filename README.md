@@ -1,1 +1,1 @@
-# portfolio-art-generator
+# profile-art-generator
