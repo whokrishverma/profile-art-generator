@@ -11,6 +11,7 @@ name: Generate and publish profile art
 #   - ascii portrait: regenerated when photo.jpg changes in a push, OR when
 #     your live GitHub avatar differs from photo.jpg (checked hourly and on
 #     manual run, since GitHub fires no event for an avatar change).
+#     Uses photo.type ("illustration" or "real") to pick the right generator.
 
 "on":
   schedule:
@@ -82,7 +83,12 @@ jobs:
           (github.event_name == 'push' && steps.photo_diff.outputs.changed == 'true') ||
           (github.event_name != 'push' && steps.avatar_diff.outputs.changed == 'true')
         run: |
-          python make_ascii_svg_illustration_v5.py photo.jpg ascii.svg
+          TYPE=$(cat photo.type | tr -d '[:space:]')
+          if [ "$TYPE" = "illustration" ]; then
+            python make_ascii_svg_illustration_v5.py photo.jpg ascii.svg
+          else
+            python make_ascii_svg_real_v1.py photo.jpg ascii.svg
+          fi
           echo "done=true" >> "$GITHUB_OUTPUT"
 
       - name: Regenerate contribution heatmap
