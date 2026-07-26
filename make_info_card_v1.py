@@ -49,7 +49,7 @@ HOST_DOMAIN = "github"    # accent part
 # before publishing so it accurately represents your skills.
 ROWS = [
     ("host",),
-    ("kv", "Now", "AI/ML Intern @ Mankind"),
+    ("kv", "Now", "SDE Intern (AI/LLM) @ Mankind"),
     ("gap",),
     ("sec", "Stack"),
     ("kv", "Frontend", "React, Next.js, TypeScript, R3F"),
