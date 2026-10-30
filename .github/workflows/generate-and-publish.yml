@@ -103,6 +103,8 @@ jobs:
         if: >
           github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
           github.event_name == 'schedule'
+        env:
+          PROFILE_REPO_PAT: ${{ secrets.PROFILE_REPO_PAT }}
         run: |
           python generate_streak_svg_v1.py whokrishverma contrib-heatmap.svg
           echo "done=true" >> "$GITHUB_OUTPUT"
