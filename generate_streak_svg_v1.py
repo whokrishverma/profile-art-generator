@@ -102,6 +102,7 @@ MONTHS = {
     "May": "May", "June": "Jun", "July": "Jul", "August": "Aug",
     "September": "Sep", "October": "Oct", "November": "Nov", "December": "Dec",
 }
+COLORS = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"]
 LEVELS = {
     "NONE": 0,
     "FIRST_QUARTILE": 1,
@@ -148,8 +149,10 @@ for wk, week in enumerate(weeks):
         if level is None:
             raise RuntimeError(f"Unknown GitHub contribution level: {level_name}")
 
-        # Use GitHub's exact per-day color. The animation remains unchanged.
-        color = day["color"]
+        # Keep the original dark-theme palette. GraphQL day["color"] can
+        # reflect GitHub's light-theme palette, so map the authoritative
+        # contributionLevel to our existing dark-theme colors instead.
+        color = COLORS[level]
         x = LEFT + wk * (CELL + GAP)
         y = TOP + row * (CELL + GAP)
         delay = round((wk + row * 0.55) / maxorder * REVEAL, 3)
