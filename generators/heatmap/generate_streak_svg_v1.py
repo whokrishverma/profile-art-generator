@@ -93,19 +93,6 @@ def get_data(user):
 calendar, contribs = get_data(USER)
 total = calendar["totalContributions"]
 
-print("\n--- GITHUB API COLOR DEBUG ---")
-
-for day in contribs:
-    if day["contributionCount"] > 0:
-        print(
-            f'{day["date"]} | '
-            f'Count: {day["contributionCount"]} | '
-            f'Level: {day["contributionLevel"]} | '
-            f'API Color: {day["color"]}'
-        )
-
-print("\n--- END DEBUG ---\n")
-
 # ---- layout (preserved) ----
 CELL, GAP, RAD, LEFT, TOP = 13, 3, 2.5, 34, 24
 FLASH = "#b4ffaa"
@@ -115,9 +102,16 @@ MONTHS = {
     "May": "May", "June": "Jun", "July": "Jul", "August": "Aug",
     "September": "Sep", "October": "Oct", "November": "Nov", "December": "Dec",
 }
-# COLORS = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"]
-# COLORS = ["#151c24", "#fac791", "#c46314", "#994c11", "#e3cf4f"]  
-# GitHub's dark-theme colors
+
+# GitHub dark-mode Halloween palette sampled from the supplied GitHub screenshot.
+COLORS = [
+    "#161b22",  # Level 0: No contributions
+    "#f2c897",  # Level 1: First quartile
+    "#b7672b",  # Level 2: Second quartile
+    "#8e4f21",  # Level 3: Third quartile
+    "#e0d165",  # Level 4: Fourth quartile
+]
+
 LEVELS = {
     "NONE": 0,
     "FIRST_QUARTILE": 1,
@@ -164,15 +158,8 @@ for wk, week in enumerate(weeks):
         if level is None:
             raise RuntimeError(f"Unknown GitHub contribution level: {level_name}")
 
-        # Keep the original dark-theme palette. GraphQL day["color"] can
-        # reflect GitHub's light-theme palette, so map the authoritative
-        # contributionLevel to our existing dark-theme colors instead.
-        # color = COLORS[level]
-
-
-        # Use GitHub's exact contribution color from GraphQL.
-        color = day["color"]
-
+        # Map GitHub's contribution level to the sampled dark Halloween palette.
+        color = COLORS[level]
 
         x = LEFT + wk * (CELL + GAP)
         y = TOP + row * (CELL + GAP)
@@ -184,7 +171,7 @@ for wk, week in enumerate(weeks):
             f'data-date="{day["date"]}" data-count="{day["contributionCount"]}"/>'
         )
 
-svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
 <style>
   text.lbl {{ fill:{GRAY}; font-size:13px; font-weight:600; }}
   text.total {{ fill:#7b848f; font-size:15px; font-weight:700; }}
@@ -198,7 +185,7 @@ svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewB
 {''.join(labels)}
 {''.join(rects)}
 <text class="total" x="{LEFT}" y="{H-6}">{total:,} contributions in the last year</text>
-</svg>'''
+</svg>"""
 
 os.makedirs(os.path.dirname(os.path.abspath(OUT)), exist_ok=True)
 with open(OUT, "w", encoding="utf-8") as output:
