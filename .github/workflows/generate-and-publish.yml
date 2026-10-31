@@ -18,8 +18,8 @@ name: Generate and publish profile art
 
 "on":
   schedule:
-    - cron: "0 */6 * * *"    # heatmap: every 6 hours
-    - cron: "30 18 * * *"    # midnight (~IST): ascii avatar check + heatmap + info card
+    - cron: "0 */6 * * *"
+    - cron: "30 18 * * *"
   workflow_dispatch: {}
   push:
     branches: [main]
@@ -27,10 +27,14 @@ name: Generate and publish profile art
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
+
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0     # full history so we can diff photo.jpg on push
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -39,50 +43,45 @@ jobs:
       - name: Install dependencies
         run: pip install pillow numpy opencv-python-headless
 
-      # ---------------------------------------------------------------
-      # 1. On a push: did photo.jpg itself change in this push?
-      # ---------------------------------------------------------------
-      - name: Check if photo.jpg changed in this push
+      # 1. Detect photo changes
+      - name: Check if photo changed in this push
         id: photo_diff
         if: github.event_name == 'push'
         run: |
           BEFORE="${{ github.event.before }}"
           AFTER="${{ github.event.after }}"
+
           if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif git diff --name-only "$BEFORE" "$AFTER" | grep -q '^photo\.jpg$'; then
+          elif git diff --name-only "$BEFORE" "$AFTER" | grep -q '^assets/photos/photo\.jpg$'; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # ---------------------------------------------------------------
-      # 2. Avatar check: only on manual run, or the midnight cron
-      # ---------------------------------------------------------------
+      # 2. Download GitHub avatar
       - name: Download current GitHub avatar
         id: avatar_download
         if: >
           github.event_name == 'workflow_dispatch' ||
           (github.event_name == 'schedule' && github.event.schedule == '30 18 * * *')
-        run: curl -sL "https://github.com/whokrishverma.png?size=460" -o avatar_new.jpg
+        run: curl -fsSL "https://github.com/whokrishverma.png?size=460" -o avatar_new.jpg
 
-      - name: Check if avatar differs from photo.jpg
+      - name: Check if avatar differs from photo
         id: avatar_diff
         if: steps.avatar_download.outcome == 'success'
         run: |
-          if [ -f photo.jpg ] && cmp -s photo.jpg avatar_new.jpg; then
+          if [ -f assets/photos/photo.jpg ] && cmp -s assets/photos/photo.jpg avatar_new.jpg; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Adopt new avatar as photo.jpg
+      - name: Adopt new avatar as photo
         if: steps.avatar_diff.outputs.changed == 'true'
-        run: mv avatar_new.jpg photo.jpg
+        run: mv avatar_new.jpg assets/photos/photo.jpg
 
-      # ---------------------------------------------------------------
-      # 3. Regenerate only what's due
-      # ---------------------------------------------------------------
+      # 3. Generate ASCII portrait
       - name: Regenerate ASCII portrait
         id: ascii_gen
         if: >
@@ -90,38 +89,50 @@ jobs:
           (github.event_name == 'push' && steps.photo_diff.outputs.changed == 'true') ||
           (github.event_name == 'schedule' && steps.avatar_diff.outputs.changed == 'true')
         run: |
+          mkdir -p generated
+
           TYPE=$(cat assets/photos/photo.type | tr -d '[:space:]')
+
           if [ "$TYPE" = "illustration" ]; then
-            python make_ascii_svg_illustration_v5.py photo.jpg ascii.svg
+            python generators/ascii/make_ascii_svg_illustration_v5.py \
+              assets/photos/photo.jpg ascii.svg
           else
-            python generators/ascii/make_ascii_svg_real_v1.py photo.jpg ascii.svg
+            python generators/ascii/make_ascii_svg_real_v1.py \
+              assets/photos/photo.jpg ascii.svg
           fi
+
           echo "done=true" >> "$GITHUB_OUTPUT"
 
+      # 4. Generate contribution heatmap
       - name: Regenerate contribution heatmap
         id: heatmap_gen
         if: >
-          github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
+          github.event_name == 'push' ||
+          github.event_name == 'workflow_dispatch' ||
           github.event_name == 'schedule'
         env:
           PROFILE_REPO_PAT: ${{ secrets.PROFILE_REPO_PAT }}
         run: |
-          python generate_streak_svg_v1.py whokrishverma contrib-heatmap.svg
+          mkdir -p generated
+
+          python generators/heatmap/generate_streak_svg_v1.py \
+            whokrishverma generated/contrib-heatmap.svg
+
           echo "done=true" >> "$GITHUB_OUTPUT"
 
+      # 5. Generate info card
       - name: Regenerate info card
         id: infocard_gen
         if: >
-          github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
+          github.event_name == 'push' ||
+          github.event_name == 'workflow_dispatch' ||
           (github.event_name == 'schedule' && github.event.schedule == '30 18 * * *')
         run: |
-          python make_info_card_v1.py
+          python generators/info-card/make_info_card_v1.py
           echo "done=true" >> "$GITHUB_OUTPUT"
 
-      # ---------------------------------------------------------------
-      # 4. Push only the files that were actually regenerated AND changed
-      # ---------------------------------------------------------------
-      - name: Push generated SVGs to the public profile repo
+      # 6. Publish generated artwork
+      - name: Push generated SVGs to public profile repo
         if: >
           steps.ascii_gen.outputs.done == 'true' ||
           steps.heatmap_gen.outputs.done == 'true' ||
@@ -130,12 +141,26 @@ jobs:
           GH_TOKEN: ${{ secrets.PROFILE_REPO_PAT }}
         run: |
           git clone https://x-access-token:${GH_TOKEN}@github.com/whokrishverma/whokrishverma.git public-repo
-          [ "${{ steps.ascii_gen.outputs.done }}" = "true" ] && cp ascii.svg public-repo/
-          [ "${{ steps.heatmap_gen.outputs.done }}" = "true" ] && cp contrib-heatmap.svg public-repo/
-          [ "${{ steps.infocard_gen.outputs.done }}" = "true" ] && cp info-card.svg public-repo/
+
+          if [ "${{ steps.ascii_gen.outputs.done }}" = "true" ]; then
+            cp ascii.svg public-repo/
+          fi
+
+          if [ "${{ steps.heatmap_gen.outputs.done }}" = "true" ]; then
+            cp generated/contrib-heatmap.svg public-repo/
+          fi
+
+          if [ "${{ steps.infocard_gen.outputs.done }}" = "true" ]; then
+            cp info-card.svg public-repo/
+          fi
+
           cd public-repo
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
           git add ascii.svg contrib-heatmap.svg info-card.svg
+
           git diff --staged --quiet || git commit -m "chore: refresh profile art [skip ci]"
+
           git push
