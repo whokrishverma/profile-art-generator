@@ -102,7 +102,9 @@ MONTHS = {
     "May": "May", "June": "Jun", "July": "Jul", "August": "Aug",
     "September": "Sep", "October": "Oct", "November": "Nov", "December": "Dec",
 }
-COLORS = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"]
+# COLORS = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"]
+COLORS = ["#151c24", "#fac791", "#c46314", "#994c11", "#e3cf4f"]  
+# GitHub's dark-theme colors
 LEVELS = {
     "NONE": 0,
     "FIRST_QUARTILE": 1,
