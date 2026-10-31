@@ -104,12 +104,19 @@ MONTHS = {
 }
 
 # GitHub dark-mode Halloween palette sampled from the supplied GitHub screenshot.
+# COLORS = [
+#     "#161a21",  # Level 0: No contributions
+#     "#0d4429",  # Level 1: First quartile
+#     "#016d32",  # Level 2: Second quartile
+#     "#27a641",  # Level 3: Third quartile
+#     "#39d453",  # Level 4: Fourth quartile
+# ]
 COLORS = [
     "#151c24",  # Level 0: No contributions
-    "#fac690",  # Level 1: First quartile
-    "#c46314",  # Level 2: Second quartile
-    "#994c11",  # Level 3: Third quartile
-    "#e3cf4f",  # Level 4: Fourth quartile
+    "#023b16",  # Level 1: First quartile
+    "#196b2d",  # Level 2: Second quartile
+    "#2da142",  # Level 3: Third quartile
+    "#57d465",  # Level 4: Fourth quartile
 ]
 
 LEVELS = {
