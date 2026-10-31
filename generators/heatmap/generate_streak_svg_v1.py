@@ -103,7 +103,7 @@ MONTHS = {
     "September": "Sep", "October": "Oct", "November": "Nov", "December": "Dec",
 }
 # COLORS = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"]
-COLORS = ["#151c24", "#fac791", "#c46314", "#994c11", "#e3cf4f"]  
+# COLORS = ["#151c24", "#fac791", "#c46314", "#994c11", "#e3cf4f"]  
 # GitHub's dark-theme colors
 LEVELS = {
     "NONE": 0,
@@ -154,7 +154,13 @@ for wk, week in enumerate(weeks):
         # Keep the original dark-theme palette. GraphQL day["color"] can
         # reflect GitHub's light-theme palette, so map the authoritative
         # contributionLevel to our existing dark-theme colors instead.
-        color = COLORS[level]
+        # color = COLORS[level]
+
+
+        # Use GitHub's exact contribution color from GraphQL.
+        color = day["color"]
+
+        
         x = LEFT + wk * (CELL + GAP)
         y = TOP + row * (CELL + GAP)
         delay = round((wk + row * 0.55) / maxorder * REVEAL, 3)
