@@ -93,6 +93,19 @@ def get_data(user):
 calendar, contribs = get_data(USER)
 total = calendar["totalContributions"]
 
+print("\n--- GITHUB API COLOR DEBUG ---")
+
+for day in contribs:
+    if day["contributionCount"] > 0:
+        print(
+            f'{day["date"]} | '
+            f'Count: {day["contributionCount"]} | '
+            f'Level: {day["contributionLevel"]} | '
+            f'API Color: {day["color"]}'
+        )
+
+print("\n--- END DEBUG ---\n")
+
 # ---- layout (preserved) ----
 CELL, GAP, RAD, LEFT, TOP = 13, 3, 2.5, 34, 24
 FLASH = "#b4ffaa"
@@ -160,7 +173,7 @@ for wk, week in enumerate(weeks):
         # Use GitHub's exact contribution color from GraphQL.
         color = day["color"]
 
-        
+
         x = LEFT + wk * (CELL + GAP)
         y = TOP + row * (CELL + GAP)
         delay = round((wk + row * 0.55) / maxorder * REVEAL, 3)
