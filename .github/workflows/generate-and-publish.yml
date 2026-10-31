@@ -90,11 +90,11 @@ jobs:
           (github.event_name == 'push' && steps.photo_diff.outputs.changed == 'true') ||
           (github.event_name == 'schedule' && steps.avatar_diff.outputs.changed == 'true')
         run: |
-          TYPE=$(cat photo.type | tr -d '[:space:]')
+          TYPE=$(cat assets/photos/photo.type | tr -d '[:space:]')
           if [ "$TYPE" = "illustration" ]; then
             python make_ascii_svg_illustration_v5.py photo.jpg ascii.svg
           else
-            python make_ascii_svg_real_v1.py photo.jpg ascii.svg
+            python generators/ascii/make_ascii_svg_real_v1.py photo.jpg ascii.svg
           fi
           echo "done=true" >> "$GITHUB_OUTPUT"
 
