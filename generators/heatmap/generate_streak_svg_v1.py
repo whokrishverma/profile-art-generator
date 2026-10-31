@@ -179,6 +179,7 @@ svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewB
 <text class="total" x="{LEFT}" y="{H-6}">{total:,} contributions in the last year</text>
 </svg>'''
 
+os.makedirs(os.path.dirname(os.path.abspath(OUT)), exist_ok=True)
 with open(OUT, "w", encoding="utf-8") as output:
     output.write(svg)
 print(f"Wrote {OUT}: {len(contribs)} days, {total:,} contributions, {len(svg)//1024} KB")
