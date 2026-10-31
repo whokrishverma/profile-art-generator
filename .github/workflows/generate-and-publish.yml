@@ -132,27 +132,26 @@ jobs:
           echo "done=true" >> "$GITHUB_OUTPUT"
 
       # 6. Publish generated artwork
-      - name: Push generated SVGs to public profile repo
-        if: >
-          steps.ascii_gen.outputs.done == 'true' ||
-          steps.heatmap_gen.outputs.done == 'true' ||
-          steps.infocard_gen.outputs.done == 'true'
+      - name: Push generated SVGs to the public profile repo
         env:
           GH_TOKEN: ${{ secrets.PROFILE_REPO_PAT }}
         run: |
           git clone https://x-access-token:${GH_TOKEN}@github.com/whokrishverma/whokrishverma.git public-repo
 
-          if [ "${{ steps.ascii_gen.outputs.done }}" = "true" ]; then
-            cp ascii.svg public-repo/
-          fi
+          copy_if_exists() {
+            FILE=$(find . -type f -name "$1" -not -path './public-repo/*' -not -path './.git/*' -print -quit)
 
-          if [ "${{ steps.heatmap_gen.outputs.done }}" = "true" ]; then
-            cp generated/contrib-heatmap.svg public-repo/
-          fi
+            if [ -n "$FILE" ]; then
+              echo "Publishing $FILE"
+              cp "$FILE" "public-repo/$1"
+            else
+              echo "WARNING: $1 was not generated. Skipping."
+            fi
+          }
 
-          if [ "${{ steps.infocard_gen.outputs.done }}" = "true" ]; then
-            cp info-card.svg public-repo/
-          fi
+          copy_if_exists "ascii.svg"
+          copy_if_exists "contrib-heatmap.svg"
+          copy_if_exists "info-card.svg"
 
           cd public-repo
 
