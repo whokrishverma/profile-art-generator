@@ -1,2 +1,3 @@
-
-PROFILE_REPO_PAT = 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
+"""Runtime secrets must be supplied through environment variables / GitHub Actions secrets.
+Do not store personal access tokens in source files.
+"""

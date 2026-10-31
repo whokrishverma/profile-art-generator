@@ -13,7 +13,9 @@ import html
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "info-card.svg")
+import sys
+OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "info-card.svg")
+os.makedirs(os.path.dirname(os.path.abspath(OUT)), exist_ok=True)
 STATIC = bool(os.environ.get("STATIC"))
 
 W, H = 480, 376
